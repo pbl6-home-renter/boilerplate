@@ -11,7 +11,6 @@ export class TypeOrmConfigService implements TypeOrmOptionsFactory {
     return {
       type: 'postgres',
       dropSchema: false,
-      keepConnectionAlive: true,
       entities: [
         __dirname +
           '/../../../modules/**/infra/persistence/*{.typeorm-entity,.entity}{.ts,.js}',

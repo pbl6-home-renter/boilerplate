@@ -41,8 +41,63 @@ export class ApiConfigService {
     return this.getString('LOG_LEVEL', 'debug');
   }
 
+  get databaseUrl(): string | undefined {
+    const value = this.configService.get<string>('DATABASE_URL');
+
+    if (!value || value.trim() === '') {
+      return undefined;
+    }
+
+    return value.trim();
+  }
+
+  get dbSsl(): boolean {
+    const explicitSsl = this.configService.get<string>('DB_SSL');
+
+    if (explicitSsl !== undefined && explicitSsl.trim() !== '') {
+      return explicitSsl.trim().toLowerCase() === 'true';
+    }
+
+    const databaseUrl = this.databaseUrl;
+
+    if (databaseUrl) {
+      try {
+        const hostname = new URL(databaseUrl).hostname;
+
+        if (
+          hostname.endsWith('.supabase.co') ||
+          hostname.endsWith('.pooler.supabase.com')
+        ) {
+          return true;
+        }
+      } catch {
+        // PostgreSQL driver will report malformed URL later.
+      }
+    }
+
+    const dbHost = this.configService.get<string>('DB_HOST') ?? '';
+
+    if (
+      dbHost.endsWith('.supabase.co') ||
+      dbHost.endsWith('.pooler.supabase.com')
+    ) {
+      return true;
+    }
+
+    return this.isProduction;
+  }
+
   get dbConfig() {
-    const isProd = this.isProduction;
+    const ssl = this.dbSsl ? { rejectUnauthorized: false } : false;
+    const databaseUrl = this.databaseUrl;
+
+    if (databaseUrl) {
+      return {
+        url: databaseUrl,
+        logging: this.getBoolean('ENABLE_ORM_LOGS', false),
+        ssl,
+      };
+    }
 
     return {
       host: this.getString('DB_HOST', 'localhost'),
@@ -51,21 +106,24 @@ export class ApiConfigService {
       password: this.getString('DB_PASSWORD', 'postgres'),
       database: this.getString('DB_DATABASE', 'app_db'),
       logging: this.getBoolean('ENABLE_ORM_LOGS', false),
-      ssl: isProd ? { rejectUnauthorized: false } : false,
+      ssl,
     };
   }
 
   private getNumber(key: string, defaultValue?: number): number {
     const value = this.get(key, defaultValue?.toString());
     const parsed = Number(value);
+
     if (isNaN(parsed)) {
       throw new Error(`Environment variable "${key}" is not a valid number`);
     }
+
     return parsed;
   }
 
   private getBoolean(key: string, defaultValue?: boolean): boolean {
     const value = this.get(key, defaultValue?.toString());
+
     try {
       return Boolean(JSON.parse(value));
     } catch {
@@ -75,6 +133,7 @@ export class ApiConfigService {
 
   private getString(key: string, defaultValue?: string): string {
     const value = this.get(key, defaultValue);
+
     return value.replaceAll('\\n', '\n');
   }
 
@@ -85,6 +144,7 @@ export class ApiConfigService {
       if (defaultValue !== undefined) {
         return defaultValue;
       }
+
       throw new Error(`Environment variable "${key}" is required but not set`);
     }
 
