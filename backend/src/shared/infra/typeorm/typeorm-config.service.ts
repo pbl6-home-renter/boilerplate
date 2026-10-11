@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from '@nestjs/typeorm';
 import { SnakeNamingStrategy } from 'shared/configuration/snake-naming.strategy';
-import { ApiConfigService } from 'shared/services/api-config.service';
+import { DatabaseConfigService } from 'shared/services/database-config.service';
 
 @Injectable()
 export class TypeOrmConfigService implements TypeOrmOptionsFactory {
-  constructor(private readonly configService: ApiConfigService) {}
+  constructor(private readonly configService: DatabaseConfigService) {}
 
   createTypeOrmOptions(): TypeOrmModuleOptions {
     return {

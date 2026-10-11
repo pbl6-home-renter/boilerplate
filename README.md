@@ -20,12 +20,7 @@ Boilerplate chuẩn doanh nghiệp (Enterprise-ready) tinh gọn và rõ ràng, 
 
 ```text
 nest-clean-architecture-boilerplate/
-├── docker-compose.yml              # Dựng trọn bộ: Backend + PostgreSQL
-├── .env.example                    # Biến môi trường mẫu
-├── postgres/                       # Dockerfile & script khởi tạo PostgreSQL
 └── backend/
-    ├── Dockerfile                  # Multi-stage Docker build
-    ├── start.sh                    # Script chạy migration -> seed -> start app
     ├── package.json
     ├── tsconfig.json
     └── src/
@@ -97,22 +92,7 @@ sequenceDiagram
 
 ## 🛠️ Hướng dẫn cài đặt & Khởi chạy
 
-### Cách 1: Khởi chạy bằng Docker Compose (Khuyên dùng)
-
-Chỉ với **1 lệnh duy nhất**, Docker sẽ khởi tạo PostgreSQL và Backend:
-
-```bash
-cd nest-clean-architecture-boilerplate
-docker-compose up --build -d
-```
-
-- **Backend API**: `http://localhost:3001/api/v1`
-- **Swagger Docs**: `http://localhost:3001/swagger`
-- **PostgreSQL**: `localhost:5432` (User/Pass: `postgres`/`postgres`)
-
----
-
-### Cách 2: Khởi chạy trực tiếp trên máy (Local Development)
+### Khởi chạy trực tiếp trên máy (Local Development)
 
 #### 1. Cài đặt dependencies:
 ```bash
@@ -121,7 +101,7 @@ npm install
 ```
 
 #### 2. Cấu hình biến môi trường:
-Tạo file `.env` từ `.env.example`:
+Tạo file `.env` từ `.env.example` trong thư mục `backend`:
 ```bash
 cp .env.example .env
 ```
