@@ -20,7 +20,6 @@ Boilerplate chuẩn doanh nghiệp (Enterprise-ready) tinh gọn và rõ ràng, 
 
 ```text
 nest-clean-architecture-boilerplate/
-└── backend/
     ├── Dockerfile
     ├── .dockerignore
     ├── start.sh
@@ -98,24 +97,30 @@ sequenceDiagram
 ### Khởi chạy trực tiếp trên máy (Local Development)
 
 #### 1. Cài đặt dependencies:
+
 ```bash
 cd nest-clean-architecture-boilerplate/backend
 npm install
 ```
 
 #### 2. Cấu hình biến môi trường:
+
 Tạo file `.env` từ `.env.example` trong thư mục `backend`:
+
 ```bash
 cp .env.example .env
 ```
+
 Chỉnh sửa thông số kết nối Database cho phù hợp với máy của bạn.
 
 #### 3. Chạy Database Migrations:
+
 ```bash
 npm run migration:run
 ```
 
 #### 4. Khởi chạy ứng dụng:
+
 ```bash
 npm run start:dev
 ```
@@ -127,39 +132,49 @@ npm run start:dev
 Khi bạn muốn thêm một tính năng/domain mới (ví dụ `products`):
 
 ### Bước 1: Tạo cấu trúc thư mục
+
 Tạo thư mục `src/modules/products/` với các thư mục con:
+
 - `domain/`: `entities/`, `repositories/`, `exceptions/`
 - `use-case/`: `commands/`, `queries/`
 - `infra/`: `persistence/`, `mappers/`
 - `presentation/`: `controllers/`, `request/`, `response/`
 
 ### Bước 2: Định nghĩa DI Token
+
 Tạo `products/product.di-token.ts`:
+
 ```typescript
 export const PRODUCT_DI_TOKEN = {
-  REPOSITORY: Symbol("PRODUCT_REPOSITORY"),
+  REPOSITORY: Symbol('PRODUCT_REPOSITORY'),
 } as const;
 ```
 
 ### Bước 3: Xây dựng Domain Model & Repository Interface
+
 1. Tạo Entity kế thừa `BaseEntity` tại `domain/entities/product.entity.ts`.
 2. Tạo interface `ProductRepository` kế thừa `BaseRepository<ProductEntity>` tại `domain/repositories/product.repository.ts`.
 
 ### Bước 4: Tạo Tầng Hạ Tầng (Infrastructure)
+
 1. Tạo TypeORM entity kế thừa `AbstractEntity` tại `infra/persistence/product.typeorm-entity.ts`.
 2. Tạo mapper chuyển đổi 2 chiều giữa Domain Entity và TypeORM Entity tại `infra/mappers/product.mapper.ts`.
 3. Tạo repository class triển khai interface `ProductRepository` tại `infra/persistence/product.repository.ts`.
 
 ### Bước 5: Viết Use Cases (CQRS)
+
 1. **Command**: Tạo `CreateProductCommand` và `CreateProductCommandHandler`.
 2. **Query**: Tạo `GetProductByIdQuery` và `GetProductByIdQueryHandler`.
 
 ### Bước 6: Xây dựng Presentation Layer
+
 1. Tạo DTOs validation tại `presentation/request/` và `presentation/response/`.
 2. Tạo Controller inject `CommandBus` và `QueryBus` tại `presentation/controllers/product.controller.ts`.
 
 ### Bước 7: Khai báo Module
+
 Tạo `products.module.ts`:
+
 ```typescript
 @Module({
   imports: [CqrsModule, TypeOrmModule.forFeature([ProductTypeormEntity])],
@@ -176,23 +191,24 @@ Tạo `products.module.ts`:
 })
 export class ProductsModule {}
 ```
+
 Cuối cùng, import `ProductsModule` vào `app.module.ts`.
 
 ---
 
 ## 📜 Các lệnh Scripts hữu ích (NPM Scripts)
 
-| Lệnh | Ý nghĩa |
-| :--- | :--- |
-| `npm run start:dev` | Chạy ứng dụng ở chế độ dev (watch mode) |
-| `npm run build` | Biên dịch TypeScript sang JavaScript trong `dist/` |
-| `npm run lint` | Kiểm tra và sửa lỗi coding convention với ESLint |
-| `npm run format` | Tự động format code với Prettier |
-| `npm run migration:create -- name=MigrationName` | Tạo một file migration mới |
-| `npm run migration:generate -- name=MigrationName` | Tự động sinh migration từ Entity thay đổi |
-| `npm run migration:run` | Áp dụng các migration chưa chạy vào Database |
-| `npm run migration:revert` | Hoàn tác migration gần nhất |
-| `npm run test` | Chạy unit test với Jest |
+| Lệnh                                               | Ý nghĩa                                            |
+| :------------------------------------------------- | :------------------------------------------------- |
+| `npm run start:dev`                                | Chạy ứng dụng ở chế độ dev (watch mode)            |
+| `npm run build`                                    | Biên dịch TypeScript sang JavaScript trong `dist/` |
+| `npm run lint`                                     | Kiểm tra và sửa lỗi coding convention với ESLint   |
+| `npm run format`                                   | Tự động format code với Prettier                   |
+| `npm run migration:create -- name=MigrationName`   | Tạo một file migration mới                         |
+| `npm run migration:generate -- name=MigrationName` | Tự động sinh migration từ Entity thay đổi          |
+| `npm run migration:run`                            | Áp dụng các migration chưa chạy vào Database       |
+| `npm run migration:revert`                         | Hoàn tác migration gần nhất                        |
+| `npm run test`                                     | Chạy unit test với Jest                            |
 
 ---
 
