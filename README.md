@@ -21,6 +21,9 @@ Boilerplate chuẩn doanh nghiệp (Enterprise-ready) tinh gọn và rõ ràng, 
 ```text
 nest-clean-architecture-boilerplate/
 └── backend/
+    ├── Dockerfile
+    ├── .dockerignore
+    ├── start.sh
     ├── package.json
     ├── tsconfig.json
     └── src/
