@@ -2,12 +2,12 @@ name: Database Keepalive
 
 on:
   schedule:
-    - cron: "17 3 * * *"
+    - cron: '17 3 * * *'
 
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Only test database connectivity"
+        description: 'Only test database connectivity'
         required: false
         default: false
         type: boolean
@@ -34,7 +34,7 @@ jobs:
       - name: Run database keepalive
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
-          DB_SSL: "true"
+          DB_SSL: 'true'
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::GitHub Actions secret SUPABASE_DATABASE_URL is not configured."
