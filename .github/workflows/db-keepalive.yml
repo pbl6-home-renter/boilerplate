@@ -17,10 +17,6 @@ jobs:
     name: Supabase Keepalive
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,9 +24,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: backend/.nvmrc
+          node-version-file: .nvmrc
           cache: npm
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -40,9 +36,14 @@ jobs:
           DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
           DB_SSL: 'true'
         run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::GitHub Actions secret SUPABASE_DATABASE_URL is not configured."
+            exit 1
+          fi
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && \
              [ "${{ inputs.dry_run }}" = "true" ]; then
-            npx --yes tsx scripts/keepalive.ts --dry-run
+            npx --yes tsx scripts/keep-alive.ts --dry-run
           else
-            npx --yes tsx scripts/keepalive.ts
+            npx --yes tsx scripts/keep-alive.ts
           fi
