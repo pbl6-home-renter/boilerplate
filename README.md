@@ -19,51 +19,93 @@ Boilerplate chuẩn doanh nghiệp (Enterprise-ready) tinh gọn và rõ ràng, 
 ## 📁 Cấu trúc thư mục (Directory Structure)
 
 ```text
-nest-clean-architecture-boilerplate/
-    ├── Dockerfile
-    ├── .dockerignore
-    ├── start.sh
-    ├── package.json
-    ├── tsconfig.json
-    └── src/
-        ├── main.ts                 # Bootstrap REST API & Swagger
-        ├── app.module.ts           # Root module
-        │
-        ├── filter/                 # Exception filters (LoggingExceptionFilter)
-        ├── utils/                  # Tiện ích chung (UUID crypto)
-        │
-        ├── shared/                 # Core dùng chung cho toàn bộ ứng dụng
-        │   ├── shared.module.ts    # Global Module
-        │   ├── configuration/      # Config Swagger, Logging, Naming Strategy
-        │   ├── services/           # ApiConfigService (type-safe config)
-        │   ├── domain/             # Base Entity, Base Repo, Base Exception, VOs
-        │   └── infra/              # TypeORM setup & config
-        │
-        └── modules/
-            └── sample/             # [MODULE KHUNG MẪU] Skeleton tham chiếu chuẩn
-                ├── sample.di-token.ts
-                ├── sample.module.ts
-                ├── domain/
-                │   ├── entities/sample.entity.ts
-                │   ├── repositories/sample.repository.ts
-                │   └── exceptions/sample-not-found.exception.ts
-                ├── use-case/
-                │   ├── commands/
-                │   │   ├── create-sample.command.ts
-                │   │   └── create-sample.command.handler.ts
-                │   └── queries/
-                │       ├── get-sample-by-id.query.ts
-                │       └── get-sample-by-id.query.handler.ts
-                ├── infra/
-                │   ├── persistence/
-                │   │   ├── sample.typeorm-entity.ts
-                │   │   └── sample.repository.ts
-                │   └── mappers/sample.mapper.ts
-                └── presentation/
-                    ├── controllers/sample.controller.ts
-                    ├── request/create-sample.request.ts
-                    └── response/sample.response.dto.ts
+boilerplate/
+├── .github/
+│   └── workflows/
+│       ├── db-keepalive.yml        # Job tự động giữ kết nối Supabase
+│       └── deploy.yml              # CI/CD Build linux/amd64 & Deploy EC2
+├── scripts/                        # Scripts bổ trợ (keepalive, migration...)
+├── src/
+│   ├── main.ts                     # Bootstrap REST API, Swagger & Validation
+│   ├── app.module.ts               # Root module nạp các module con
+│   │
+│   ├── filter/                     # Exception filters (Global Exception Filter)
+│   ├── interceptor/                # Interceptors (Logging, Transform...)
+│   ├── utils/                      # Tiện ích dùng chung (UUID crypto...)
+│   │
+│   ├── shared/                     # Shared kernel & core hạ tầng dùng chung
+│   │   ├── shared.module.ts        # Global Module
+│   │   ├── configuration/          # Cấu hình Swagger, Logger, Naming Strategy
+│   │   ├── decorators/             # Custom decorators
+│   │   ├── di-tokens/              # Global Dependency Injection Tokens
+│   │   ├── domain/                 # Base Entity, Base Repo, Base Exception, VOs
+│   │   ├── infra/                  # TypeORM data source & kết nối DB
+│   │   ├── presentation/           # Shared DTOs, response wrappers
+│   │   └── services/               # ApiConfigService (type-safe env config)
+│   │
+│   └── modules/
+│       ├── health/                 # Health check endpoint (/health)
+│       └── sample/                 # [MODULE MẪU] Chuẩn Clean Architecture & CQRS
+│           ├── sample.di-token.ts
+│           ├── sample.module.ts
+│           ├── domain/             # Entities, Repositories, Exceptions
+│           ├── use-case/           # Commands, Queries & Handlers
+│           ├── infra/              # TypeORM Entity, Repository impl, Mappers
+│           └── presentation/       # Controllers, Requests, Response DTOs
+│
+├── .env.example                    # Template biến môi trường
+├── Dockerfile                      # Multi-stage Dockerfile (build & runner)
+├── .dockerignore
+├── start.sh                        # Entrypoint script khởi động container
+├── package.json
+└── tsconfig.json
 ```
+
+---
+
+## ⚙️ Cấu hình biến môi trường (Environment Variables)
+
+Hệ thống sử dụng file `.env` được đọc và validate thông qua `ApiConfigService`. Sao chép từ mẫu:
+
+```bash
+cp .env.example .env
+```
+
+### Bảng chi tiết các biến:
+
+| Biến | Mặc định / Mẫu | Bắt buộc | Mô tả chi tiết |
+| :--- | :--- | :---: | :--- |
+| **Cấu hình ứng dụng** | | | |
+| `APP_NAME` | `MyApp` | Không | Tên hiển thị của ứng dụng trong Swagger/Logs |
+| `PORT` | `3001` | Không | Cổng HTTP server lắng nghe (mặc định 3001) |
+| `NODE_ENV` | `dev` / `production` | **Có** | Môi trường chạy (`dev`, `production`, `test`) |
+| `API_DOMAIN` | `localhost` | Không | Domain chạy API (dùng cho Swagger Docs) |
+| `API_VERSION` | `1.0.0` | Không | Phiên bản API hiện tại |
+| `ENABLE_DOCUMENTATION` | `true` | Không | Bật/Tắt Swagger UI tại `/swagger` |
+| `LOG_LEVEL` | `debug` / `info` | Không | Mức độ log (`debug`, `info`, `warn`, `error`) |
+| **Cơ sở dữ liệu (PostgreSQL / Supabase)** | | | |
+| `DATABASE_URL` | `postgresql://...` | **Có** | Chuỗi kết nối đầy đủ (khuyên dùng khi xài Supabase với connection pooler) |
+| `DB_HOST` | `localhost` | Tùy chọn | Host database (nếu không dùng `DATABASE_URL`) |
+| `DB_PORT` | `5432` | Tùy chọn | Port database |
+| `DB_USERNAME` | `postgres` | Tùy chọn | Tên người dùng database |
+| `DB_PASSWORD` | `postgres` | Tùy chọn | Mật khẩu database |
+| `DB_DATABASE` | `app_db` | Tùy chọn | Tên database |
+| `DB_SSL` | `true` / `false` | **Có** | Đặt `true` khi kết nối Supabase Cloud (bắt buộc SSL) |
+| `ENABLE_ORM_LOGS` | `false` | Không | Bật `true` nếu muốn in câu lệnh SQL ra terminal khi debug |
+| `MIGRATION_DATABASE_URL` | `postgresql://...` | Không | Connection string cho migration trực tiếp (Direct URL không qua pgbouncer) |
+| **RabbitMQ Message Broker** | | | |
+| `RABBITMQ_DEFAULT_USER` | `guest` | Không | Tài khoản đăng nhập RabbitMQ |
+| `RABBITMQ_DEFAULT_PASS` | `guest` | Không | Mật khẩu RabbitMQ |
+| `RABBITMQ_URL` | `amqp://...` | **Có** | Chuỗi kết nối RabbitMQ (`amqp://user:pass@localhost:5672` khi local, hoặc `amqp://...:5672@rabbitmq:5672` khi chạy Docker) |
+| **Redis Cache (Tùy chọn)** | | | |
+| `REDIS_HOST` | `localhost` | Không | Host Redis server |
+| `REDIS_PORT` | `6379` | Không | Cổng Redis |
+| **SMTP Mailer (Tùy chọn)** | | | |
+| `MAIL_HOST` | `smtp.gmail.com` | Không | SMTP server gửi mail |
+| `MAIL_PORT` | `465` | Không | Cổng SMTP |
+| `MAIL_USER` | `your_email@...` | Không | Tài khoản gửi mail |
+| `MAIL_PASS` | `app_password` | Không | App password Google |
+| `MAIL_FROM` | `noreply@...` | Không | Tên hiển thị người gửi |
 
 ---
 
@@ -94,35 +136,40 @@ sequenceDiagram
 
 ## 🛠️ Hướng dẫn cài đặt & Khởi chạy
 
-### Khởi chạy trực tiếp trên máy (Local Development)
+### 1. Khởi chạy trực tiếp (Local Development)
 
-#### 1. Cài đặt dependencies:
-
+#### Bước 1: Cài đặt dependencies:
 ```bash
-cd nest-clean-architecture-boilerplate/backend
 npm install
 ```
 
-#### 2. Cấu hình biến môi trường:
-
-Tạo file `.env` từ `.env.example` trong thư mục `backend`:
-
+#### Bước 2: Cấu hình biến môi trường:
 ```bash
 cp .env.example .env
+# Chỉnh sửa DATABASE_URL Supabase và RABBITMQ_URL trong .env
 ```
 
-Chỉnh sửa thông số kết nối Database cho phù hợp với máy của bạn.
-
-#### 3. Chạy Database Migrations:
-
+#### Bước 3: Chạy Database Migrations:
 ```bash
 npm run migration:run
 ```
 
-#### 4. Khởi chạy ứng dụng:
-
+#### Bước 4: Khởi chạy ứng dụng:
 ```bash
 npm run start:dev
+```
+Truy cập Swagger API Docs tại: `http://localhost:3001/swagger`
+
+---
+
+### 2. Khởi chạy bằng Docker (Local Container)
+
+```bash
+# Build Docker image
+docker build -t rentify-backend:local .
+
+# Chạy container
+docker run -p 3001:3001 --env-file .env rentify-backend:local
 ```
 
 ---
