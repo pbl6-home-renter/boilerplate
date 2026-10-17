@@ -3,7 +3,7 @@ import { SampleTypeormEntity } from '../persistence/sample.typeorm-entity';
 
 export class SampleMapper {
   static toDomain(raw: SampleTypeormEntity): SampleEntity {
-    return SampleEntity.create({
+    return SampleEntity.reconstitute({
       id: raw.id,
       title: raw.title,
       description: raw.description,

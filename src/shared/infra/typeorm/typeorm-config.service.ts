@@ -1,24 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from '@nestjs/typeorm';
-import { SnakeNamingStrategy } from 'shared/configuration/snake-naming.strategy';
-import { DatabaseConfigService } from 'shared/services/database-config.service';
+import { ApiConfigService } from 'shared/services/api-config.service';
+import { typeOrmBaseOptions } from './typeorm-base-options';
 
 @Injectable()
 export class TypeOrmConfigService implements TypeOrmOptionsFactory {
-  constructor(private readonly configService: DatabaseConfigService) {}
+  constructor(private readonly apiConfig: ApiConfigService) {}
 
   createTypeOrmOptions(): TypeOrmModuleOptions {
     return {
-      type: 'postgres',
-      dropSchema: false,
-      entities: [
-        __dirname +
-          '/../../../modules/**/infra/persistence/*{.typeorm-entity,.entity}{.ts,.js}',
-      ],
-      migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
+      ...typeOrmBaseOptions,
       migrationsRun: false,
-      namingStrategy: new SnakeNamingStrategy(),
-      ...this.configService.dbConfig,
-    } as TypeOrmModuleOptions;
+      ...this.apiConfig.databaseConfig,
+    };
   }
 }

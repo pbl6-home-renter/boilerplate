@@ -6,6 +6,8 @@ import { SampleEntity } from '../../domain/entities/sample.entity';
 import { SampleTypeormEntity } from './sample.typeorm-entity';
 import { SampleMapper } from '../mappers/sample.mapper';
 import { Uuid } from 'shared/domain/value-objects/uuid.vo';
+import { TransactionContext } from 'shared/domain/transaction/transaction-context';
+import { withTransaction } from 'shared/infra/typeorm/transaction/typeorm-transaction-context';
 import { IOffsetPaginationQueryRequestDto } from '../../../../shared/domain/pagination/i-offset-pagination.query.request.dto';
 import { IPaginationResponseDto } from '../../../../shared/domain/pagination/i-pagination.response.dto';
 import { TypeOrmPaginator } from '../../../../shared/infra/typeorm/pagination/typeorm.paginator';
@@ -17,9 +19,12 @@ export class TypeOrmSampleRepository implements SampleRepository {
     private readonly repository: Repository<SampleTypeormEntity>,
   ) {}
 
-  async save(sample: SampleEntity): Promise<void> {
+  async save(
+    sample: SampleEntity,
+    context?: TransactionContext,
+  ): Promise<void> {
     const raw = SampleMapper.toPersistence(sample);
-    await this.repository.save(raw);
+    await withTransaction(this.repository, context).save(raw);
   }
 
   async findById(id: Uuid): Promise<SampleEntity | null> {
@@ -30,6 +35,17 @@ export class TypeOrmSampleRepository implements SampleRepository {
       return null;
     }
     return SampleMapper.toDomain(raw);
+  }
+
+  async findByIdForUpdate(
+    id: Uuid,
+    context: TransactionContext,
+  ): Promise<SampleEntity | null> {
+    const raw = await withTransaction(this.repository, context).findOne({
+      where: { id, isDeleted: false },
+      lock: { mode: 'pessimistic_write' },
+    });
+    return raw ? SampleMapper.toDomain(raw) : null;
   }
 
   async findAll(): Promise<SampleEntity[]> {
@@ -57,7 +73,9 @@ export class TypeOrmSampleRepository implements SampleRepository {
       .paginate((raw) => SampleMapper.toDomain(raw));
   }
 
-  async delete(id: Uuid): Promise<void> {
-    await this.repository.update(id, { isDeleted: true });
+  async delete(id: Uuid, context?: TransactionContext): Promise<void> {
+    await withTransaction(this.repository, context).update(id, {
+      isDeleted: true,
+    });
   }
 }
