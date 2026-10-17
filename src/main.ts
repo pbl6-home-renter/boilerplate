@@ -12,25 +12,15 @@ import { configLogging } from './shared/configuration/config-logging';
 import { configureSwagger } from './shared/configuration/config-swagger';
 import { ApiConfigService } from './shared/services/api-config.service';
 import { SharedModule } from './shared/shared.module';
-// import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
   });
 
-  const configService = app.select(SharedModule).get(ApiConfigService);
+  app.enableShutdownHooks();
 
-  // app.connectMicroservice<MicroserviceOptions>({
-  //   transport: Transport.RMQ,
-  //   options: {
-  //     urls: [configService.rabbitMqUrl],
-  //     queue: configService.appName,
-  //     queueOptions: {
-  //       durable: false,
-  //     },
-  //   },
-  // });
+  const configService = app.select(SharedModule).get(ApiConfigService);
 
   app.use(cookieParser());
 
@@ -56,7 +46,6 @@ async function bootstrap() {
   configureSwagger(app, configService);
   configLogging(app, configService);
 
-  await app.startAllMicroservices();
   await app.listen(configService.serverPort);
 
   const appUrl = await app.getUrl();

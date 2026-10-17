@@ -35,21 +35,35 @@ boilerplate/
 │   │
 │   ├── shared/                     # Shared kernel & core hạ tầng dùng chung
 │   │   ├── shared.module.ts        # Global Module
+│   │   ├── application/             # Transaction and messaging ports
 │   │   ├── configuration/          # Cấu hình Swagger, Logger, Naming Strategy
 │   │   ├── decorators/             # Custom decorators
 │   │   ├── di-tokens/              # Global Dependency Injection Tokens
 │   │   ├── domain/                 # Base Entity, Base Repo, Base Exception, VOs
-│   │   ├── infra/                  # TypeORM data source & kết nối DB
+│   │   ├── infra/                  # TypeORM, RabbitMQ & transaction adapters
 │   │   ├── presentation/           # Shared DTOs, response wrappers
 │   │   └── services/               # ApiConfigService (type-safe env config)
 │   │
 │   └── modules/
 │       ├── health/                 # Health check endpoint (/health)
+│       ├── inbox/                   # Consumer-side dedup (processed_events)
+│       │   ├── application/         # InboxRepository port
+│       │   └── infra/               # TypeORM persistence
+│       ├── outbox/                  # Transactional Outbox & relay
+│       │   ├── domain/              # Outbox state machine and repository port
+│       │   ├── use-case/            # Relay orchestration
+│       │   └── infra/               # TypeORM persistence and scheduler
 │       └── sample/                 # [MODULE MẪU] Chuẩn Clean Architecture & CQRS
 │           ├── sample.di-token.ts
 │           ├── sample.module.ts
 │           ├── domain/             # Entities, Repositories, Exceptions
-│           ├── use-case/           # Commands, Queries & Handlers
+│           ├── use-case/           # Application use cases
+│           │   ├── commands/
+│           │   │   ├── implements/ # Command objects
+│           │   │   └── handlers/   # Command handlers
+│           │   └── queries/
+│           │       ├── implements/ # Query objects
+│           │       └── handlers/   # Query handlers
 │           ├── infra/              # TypeORM Entity, Repository impl, Mappers
 │           └── presentation/       # Controllers, Requests, Response DTOs
 │
@@ -97,6 +111,15 @@ cp .env.example .env
 | `RABBITMQ_DEFAULT_USER` | `guest` | Không | Tài khoản đăng nhập RabbitMQ |
 | `RABBITMQ_DEFAULT_PASS` | `guest` | Không | Mật khẩu RabbitMQ |
 | `RABBITMQ_URL` | `amqp://...` | **Có** | Chuỗi kết nối RabbitMQ (`amqp://user:pass@localhost:5672` khi local, hoặc `amqp://...:5672@rabbitmq:5672` khi chạy Docker) |
+| **Transactional Outbox** | | | |
+| `RABBITMQ_EXCHANGE` | `MyApp.events` | Không | Durable topic exchange dùng cho integration events |
+| `RABBITMQ_PREFETCH` | `10` | Không | Prefetch của channel mặc định (consumer queue dùng prefetch 1 để giữ thứ tự) |
+| `RABBITMQ_CONSUMER_MAX_ATTEMPTS` | `5` | Không | Tổng số lần xử lý một message trước khi chuyển vào `<queue>.dlq` |
+| `RABBITMQ_CONSUMER_RETRY_DELAY_MS` | `10000` | Không | Thời gian message chờ trong `<queue>.retry` trước khi xử lý lại |
+| `OUTBOX_RELAY_ENABLED` | `true` | Không | Bật/tắt relay scheduler |
+| `OUTBOX_RELAY_INTERVAL_MS` | `1000` | Không | Chu kỳ poll outbox |
+| `OUTBOX_MAX_ATTEMPTS` | `10` | Không | Tổng số lần publish (tính cả lần đầu) trước khi chuyển `FAILED` |
+| `OUTBOX_RETENTION_MS` | `604800000` | Không | Thời gian giữ row `PUBLISHED` |
 | **Redis Cache (Tùy chọn)** | | | |
 | `REDIS_HOST` | `localhost` | Không | Host Redis server |
 | `REDIS_PORT` | `6379` | Không | Cổng Redis |
@@ -258,6 +281,93 @@ Cuối cùng, import `ProductsModule` vào `app.module.ts`.
 | `npm run test`                                     | Chạy unit test với Jest                            |
 
 ---
+
+## 🧭 Kiến trúc DDD & Clean Architecture
+
+Boilerplate tổ chức mỗi bounded context theo dependency direction:
+
+```text
+Presentation → Application/Use-case → Domain
+       ↓                 ↓
+Infrastructure ─────────┘
+```
+
+- `domain/`: Entity, Aggregate Root, Value Object, domain event và repository port.
+- `use-case/`: command/query handlers và orchestration nghiệp vụ.
+- `infra/`: TypeORM entity, mapper, repository adapter, RabbitMQ adapter và scheduler.
+- `presentation/`: HTTP controller, request/response DTO và broker subscriber.
+
+Domain không import NestJS, TypeORM hay RabbitMQ. Infrastructure implement port bằng
+DI token. `BaseEntity` chỉ chứa identity/lifecycle; aggregate có behavior và là nơi
+phát domain event. Entity đọc từ database phải được reconstitute để không phát lại event.
+
+### Thêm module mới
+
+```text
+src/modules/<context>/
+├── domain/
+│   ├── entities/
+│   ├── events/
+│   ├── repositories/
+│   └── exceptions/
+├── use-case/
+│   ├── commands/
+│   └── queries/
+├── infra/
+│   ├── persistence/
+│   ├── mappers/
+│   └── messaging/
+└── presentation/
+    ├── controllers/
+    ├── request/
+    └── response/
+```
+
+Command thay đổi state và có thể phát domain event. Query chỉ đọc. Domain event mô tả
+sự kiện trong bounded context; integration event là contract gửi qua message broker.
+
+## 📬 Transactional Outbox và microservice events
+
+Khi một command cần vừa ghi database vừa publish event, không publish trực tiếp trong
+handler vì sẽ gặp dual-write problem. Boilerplate ghi aggregate và `outbox_messages`
+trong cùng local transaction, sau đó relay publish message đã commit:
+
+```text
+HTTP Request
+  → Controller
+  → Command Handler
+  → Aggregate
+  → Repository + Outbox
+  → Database Transaction
+  → Outbox Relay
+  → RabbitMQ topic exchange
+  → Consumer queue + Inbox
+```
+
+Delivery là at-least-once, không phải exactly-once. Consumer dùng `messageId` và bảng
+`processed_events` để bỏ qua duplicate. RabbitMQ dùng durable topic exchange, queue
+riêng cho từng loại aggregate, kèm retry queue (TTL) và DLQ. Ordering chỉ được cam kết
+trong cùng aggregate; các aggregate khác có thể xử lý độc lập. Message outbox `FAILED`
+được gỡ bằng `npm run outbox:requeue -- <message-id>`.
+
+Transaction context được truyền explicit qua `IUnitOfWork`, không dùng
+`AsyncLocalStorage`. RabbitMQ adapter dùng `@golevelup/nestjs-rabbitmq` và publisher
+confirm; `@nestjs/microservices`/`ClientProxy` không còn được sử dụng.
+
+Tài liệu học tập đầy đủ: [`docs/transactional-outbox-design.md`](docs/transactional-outbox-design.md).
+
+### Transactional Outbox quick start
+
+```bash
+npm install
+cp .env.example .env
+npm run migration:run
+npm run start:dev
+```
+
+Các biến chính gồm `RABBITMQ_EXCHANGE`, `RABBITMQ_PREFETCH`, `OUTBOX_RELAY_INTERVAL_MS`,
+`OUTBOX_MAX_ATTEMPTS` và `OUTBOX_RETENTION_MS`. Có thể tắt relay bằng
+`OUTBOX_RELAY_ENABLED=false`.
 
 ## 🛡️ License
 

@@ -1,6 +1,8 @@
-import { BaseEntity } from 'shared/domain/entities/base.entity';
+import { AggregateRoot } from 'shared/domain/entities/aggregate-root';
 import { Uuid } from 'shared/domain/value-objects/uuid.vo';
 import { generateUuid } from 'utils/uuid.utils';
+import { SampleCreatedEvent } from '../events/sample-created.event';
+import { SampleDeletedEvent } from '../events/sample-deleted.event';
 
 export interface CreateSampleProps {
   id?: Uuid;
@@ -11,7 +13,7 @@ export interface CreateSampleProps {
   isDeleted?: boolean;
 }
 
-export class SampleEntity extends BaseEntity {
+export class SampleEntity extends AggregateRoot {
   private _title: string;
   private _description?: string;
 
@@ -29,6 +31,16 @@ export class SampleEntity extends BaseEntity {
   }
 
   static create(props: CreateSampleProps): SampleEntity {
+    const sample = SampleEntity.reconstitute(props);
+
+    sample.addDomainEvent(
+      new SampleCreatedEvent(sample.id, sample.title, sample.description),
+    );
+
+    return sample;
+  }
+
+  static reconstitute(props: CreateSampleProps): SampleEntity {
     return new SampleEntity(
       props.id ?? generateUuid(),
       props.title,
@@ -45,6 +57,14 @@ export class SampleEntity extends BaseEntity {
 
   get description(): string | undefined {
     return this._description;
+  }
+
+  delete(): void {
+    if (this.isDeleted) return;
+
+    this.markAsDeleted();
+
+    this.addDomainEvent(new SampleDeletedEvent(this.id));
   }
 
   updateTitle(title: string): void {

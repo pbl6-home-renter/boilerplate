@@ -25,6 +25,8 @@
     "migration:run:prod": "typeorm migration:run -d dist/shared/infra/typeorm/data-source.js",
     "migration:revert": "npm run typeorm -- migration:revert",
     "schema:drop": "npm run typeorm -- schema:drop",
+    "outbox:requeue": "ts-node -r tsconfig-paths/register src/modules/outbox/infra/cli/requeue-failed-outbox.ts",
+    "outbox:requeue:prod": "node dist/modules/outbox/infra/cli/requeue-failed-outbox.js",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -34,12 +36,12 @@
     ]
   },
   "dependencies": {
+    "@golevelup/nestjs-rabbitmq": "^9.1.0",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/cqrs": "^12.1.0",
     "@nestjs/jwt": "^12.0.2",
-    "@nestjs/microservices": "^12.1.2",
     "@nestjs/passport": "^12.0.0",
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/swagger": "^12.0.2",

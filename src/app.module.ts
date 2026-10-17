@@ -5,9 +5,10 @@ import { ResponseTransformInterceptor } from './interceptor/response-transform.i
 import { SharedModule } from './shared/shared.module';
 import { SampleModule } from './modules/sample/sample.module';
 import { HealthModule } from './modules/health/health.module';
+import { OutboxModule } from './modules/outbox/outbox.module';
 
 @Module({
-  imports: [SharedModule, SampleModule, HealthModule],
+  imports: [SharedModule, SampleModule, OutboxModule, HealthModule],
   providers: [
     {
       provide: APP_FILTER,
