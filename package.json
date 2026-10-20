@@ -25,6 +25,7 @@
     "migration:run:prod": "typeorm migration:run -d dist/shared/infra/typeorm/data-source.js",
     "migration:revert": "npm run typeorm -- migration:revert",
     "schema:drop": "npm run typeorm -- schema:drop",
+    "seed:run": "node --require ts-node/register --require tsconfig-paths/register ./node_modules/typeorm-extension/bin/cli.mjs seed:run --preserveFilePaths -d src/shared/infra/typeorm/data-source.ts",
     "outbox:requeue": "ts-node -r tsconfig-paths/register src/modules/outbox/infra/cli/requeue-failed-outbox.ts",
     "outbox:requeue:prod": "node dist/modules/outbox/infra/cli/requeue-failed-outbox.js",
     "prepare": "husky"
@@ -59,7 +60,8 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "tsconfig-paths": "^4.2.0",
-    "typeorm": "^1.1.1"
+    "typeorm": "^1.1.1",
+    "typeorm-extension": "^4.3.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",

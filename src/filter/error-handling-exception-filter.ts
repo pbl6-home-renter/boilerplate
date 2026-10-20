@@ -7,12 +7,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+
 import { BaseException } from '../shared/domain/exceptions/base.exception';
 
-/**
- * Standard Error Response envelope according to api-conventions.md §1 & §3.
- * Client receives ONLY statusCode and code.
- */
+import { isMalformedJsonError } from './malformed-json-error.util';
+
 interface ErrorResponsePayload {
   statusCode: number;
   code: string;
@@ -41,16 +40,19 @@ export class LoggingExceptionFilter implements ExceptionFilter {
     let status: number;
     let code: string;
 
-    // 1. Domain Exceptions (Clean Architecture BaseException)
     if (exception instanceof BaseException) {
       status = exception.statusCode || HttpStatus.BAD_REQUEST;
       code =
         exception.code || HTTP_STATUS_TO_DEFAULT_CODE[status] || 'BAD_REQUEST';
       const logMessage = `[DomainException] ${exception.name} (${status}) [${code}]: ${exception.message}`;
       this.logger.warn(`${logMessage} - Path: ${request.url}`);
-    }
-    // 2. NestJS HttpExceptions (ValidationPipe, NotFoundException, etc.)
-    else if (exception instanceof HttpException) {
+    } else if (isMalformedJsonError(exception)) {
+      status = HttpStatus.BAD_REQUEST;
+      code = 'INVALID_JSON';
+      this.logger.warn(
+        `[InvalidJsonException] (${status}) [${code}]: Malformed JSON body - Path: ${request.url}`,
+      );
+    } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
       let logMessage: string;
@@ -58,17 +60,16 @@ export class LoggingExceptionFilter implements ExceptionFilter {
       if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
         const resObj = exceptionResponse as Record<string, any>;
 
-        // Handle ValidationPipe errors -> map to 422 VALIDATION_FAILED
-        if (
+        if (resObj.code && typeof resObj.code === 'string') {
+          code = resObj.code;
+          logMessage = `[HttpException] ${exception.name} (${status}) [${code}]: ${resObj.message || exception.message}`;
+        } else if (
           status === HttpStatus.UNPROCESSABLE_ENTITY ||
           (status === HttpStatus.BAD_REQUEST && Array.isArray(resObj.message))
         ) {
           status = HttpStatus.UNPROCESSABLE_ENTITY;
           code = 'VALIDATION_FAILED';
           logMessage = `[ValidationException] (${status}) [${code}]: ${JSON.stringify(resObj.message)}`;
-        } else if (resObj.code && typeof resObj.code === 'string') {
-          code = resObj.code;
-          logMessage = `[HttpException] ${exception.name} (${status}) [${code}]: ${resObj.message || exception.message}`;
         } else {
           code = HTTP_STATUS_TO_DEFAULT_CODE[status] || 'BAD_REQUEST';
           logMessage = `[HttpException] ${exception.name} (${status}) [${code}]: ${resObj.message || exception.message}`;
@@ -79,24 +80,21 @@ export class LoggingExceptionFilter implements ExceptionFilter {
       }
 
       this.logger.warn(`${logMessage} - Path: ${request.url}`);
-    }
-    // 3. Unhandled Standard Errors & Unknown Exceptions
-    else if (exception instanceof Error) {
+    } else if (exception instanceof Error) {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
-      code = 'INTERNAL_ERROR';
+      code = 'INTERNAL_SERVER_ERROR';
       this.logger.error(
         `[UnhandledException] ${exception.message} - Path: ${request.url}`,
         exception.stack,
       );
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
-      code = 'INTERNAL_ERROR';
+      code = 'INTERNAL_SERVER_ERROR';
       this.logger.error(
         `[UnknownException] ${String(exception)} - Path: ${request.url}`,
       );
     }
 
-    // Client response strictly contains only statusCode and code per spec
     const errorPayload: ErrorResponsePayload = {
       statusCode: status,
       code,

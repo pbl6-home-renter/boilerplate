@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Response } from 'express';
@@ -29,6 +30,10 @@ export class ResponseTransformInterceptor<T> implements NestInterceptor<
     context: ExecutionContext,
     next: CallHandler,
   ): Observable<SuccessResponse<T> | T> {
+    if (context.getType() !== 'http') {
+      return next.handle();
+    }
+
     const http = context.switchToHttp();
     const response = http.getResponse<Response>();
 
@@ -36,23 +41,23 @@ export class ResponseTransformInterceptor<T> implements NestInterceptor<
       map((data) => {
         const statusCode = response?.statusCode ?? HttpStatus.OK;
 
-        // 204 No Content
         if (statusCode === HttpStatus.NO_CONTENT) {
           return data;
         }
 
-        // If response headers already sent (e.g. streaming or custom file download)
         if (response?.headersSent) {
           return data;
         }
 
-        // Check for custom code from @ResponseCode() decorator
+        if (data instanceof StreamableFile) {
+          return data;
+        }
+
         const customCode = this.reflector.getAllAndOverride<string>(
           RESPONSE_CODE_METADATA_KEY,
           [context.getHandler(), context.getClass()],
         );
 
-        // Check if data is already wrapped with standard envelope { statusCode, code, data }
         if (
           data !== null &&
           typeof data === 'object' &&
@@ -63,7 +68,6 @@ export class ResponseTransformInterceptor<T> implements NestInterceptor<
           return data;
         }
 
-        // Determine code
         let code = customCode;
         if (!code) {
           if (
@@ -80,7 +84,6 @@ export class ResponseTransformInterceptor<T> implements NestInterceptor<
           }
         }
 
-        // Handle collection response with pagination
         if (
           data !== null &&
           typeof data === 'object' &&
