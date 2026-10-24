@@ -11,6 +11,7 @@ import {
 } from '../configuration/database.config';
 import { OutboxConfig } from '../configuration/outbox.config';
 import { RabbitMqConfig } from '../configuration/rabbitmq.config';
+import { AuthConfig } from '../configuration/auth.config';
 
 @Injectable()
 export class ApiConfigService {
@@ -118,5 +119,23 @@ export class ApiConfigService {
 
   get logLevel(): string {
     return getConfigString(this.configService, 'LOG_LEVEL', 'debug');
+  }
+
+  get auth(): AuthConfig {
+    return {
+      jwksUrl: getConfigString(this.configService, 'JWKS_URL', ''),
+      publicKey: getConfigString(this.configService, 'JWT_PUBLIC_KEY', ''),
+      issuer: getConfigString(
+        this.configService,
+        'JWT_ISSUER',
+        'rentify-identity',
+      ),
+      audience: getConfigString(
+        this.configService,
+        'JWT_AUDIENCE',
+        'rentify-api',
+      ),
+      serviceToken: getConfigString(this.configService, 'SERVICE_TOKEN', ''),
+    };
   }
 }

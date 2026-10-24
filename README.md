@@ -369,6 +369,43 @@ Các biến chính gồm `RABBITMQ_EXCHANGE`, `RABBITMQ_PREFETCH`, `OUTBOX_RELAY
 `OUTBOX_MAX_ATTEMPTS` và `OUTBOX_RETENTION_MS`. Có thể tắt relay bằng
 `OUTBOX_RELAY_ENABLED=false`.
 
+## 🔐 Xác thực (Authentication)
+
+Mỗi service **tự verify access token** (RS256) do Identity-Service phát hành, kể cả khi request đã qua API Gateway. Không dùng header `x-user-*` để phân quyền: trong private network, ai gọi thẳng service cũng có thể tự gắn header đó, còn chữ ký JWT thì không giả được. Verify chạy cục bộ với JWKS đã cache (5 phút), không thêm network hop.
+
+`SecurityModule` ([src/shared/security.module.ts](src/shared/security.module.ts)) đăng ký các guard toàn cục theo thứ tự:
+
+| Guard | Việc làm | Lỗi |
+|---|---|---|
+| `ServiceTokenGuard` | Route `@InternalOnly()`: kiểm `X-Service-Token` = `SERVICE_TOKEN` | `401 UNAUTHORIZED` |
+| `JwtAuthGuard` | Mọi route **mặc định cần token**; gắn `request.user = { id, role, status }` | `401 UNAUTHORIZED`, `503 AUTH_UNAVAILABLE` (không tải được JWKS) |
+| `RolesGuard` | Kiểm `@Roles(...)` | `403 FORBIDDEN` |
+| `ActiveUserGuard` | Chặn user `status=locked`, trừ khi `@AllowLocked(...)` cho phép role đó | `403 ACCOUNT_LOCKED` |
+
+Mọi guard đều phải pass; thứ tự chỉ quyết định lỗi nào được trả khi nhiều guard cùng fail.
+
+Decorator ([src/shared/decorators/auth.decorators.ts](src/shared/decorators/auth.decorators.ts)):
+
+```ts
+@Public()                         // không cần token (có token hợp lệ vẫn gắn request.user)
+@Roles(UserRole.LANDLORD)         // giới hạn role
+@AllowLocked()                    // cho phép mọi role bị khóa (vd. GET /me)
+@AllowLocked(UserRole.TENANT)     // chỉ tenant bị khóa được gọi (vd. xem/thanh toán hoá đơn)
+@InternalOnly()                   // service-to-service, xác thực bằng X-Service-Token
+@CurrentUser() user: AuthenticatedUser
+```
+
+Quy ước đường dẫn khi fork:
+
+- Đổi `SERVICE_PATH` trong [src/shared/constants/service.constants.ts](src/shared/constants/service.constants.ts) (vd. `tenancy`). Health: `GET /api/v1/<SERVICE_PATH>/health`, Swagger: `/api/v1/<SERVICE_PATH>/swagger`.
+- Endpoint nội bộ đặt dưới `internal/...` (nằm **ngoài** prefix `api/v1`, gateway không route tới).
+- Ownership dữ liệu (vd. landlord chỉ sửa building của mình) kiểm tra trong use-case, không phải guard.
+- Service không bật CORS; API Gateway lo phần này.
+
+Biến môi trường: `JWKS_URL` (hoặc `JWT_PUBLIC_KEY`), `JWT_ISSUER`, `JWT_AUDIENCE` phải khớp Identity-Service; `SERVICE_TOKEN` dùng chung giữa các service.
+
+---
+
 ## 🛡️ License
 
 Dự án phát hành theo giấy phép MIT.

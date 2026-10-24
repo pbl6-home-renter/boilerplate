@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { ApiConfigService } from 'shared/services/api-config.service';
+import { SERVICE_PATH } from 'shared/constants/service.constants';
 
 export function configureSwagger(
   app: INestApplication,
@@ -17,7 +18,9 @@ export function configureSwagger(
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('swagger', app, document, {
+    SwaggerModule.setup(`${SERVICE_PATH}/swagger`, app, document, {
+      useGlobalPrefix: true,
+      jsonDocumentUrl: `${SERVICE_PATH}/swagger/json`,
       swaggerOptions: {
         persistAuthorization: true,
       },
