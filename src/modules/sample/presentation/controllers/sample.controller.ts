@@ -9,7 +9,12 @@ import {
   Post,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ApiSuccessResponse } from 'shared/decorators/api-success-response.decorator';
 import { ResponseCode } from 'shared/decorators/response-code.decorator';
 import { Uuid } from 'shared/domain/value-objects/uuid.vo';
@@ -20,8 +25,11 @@ import { GetSampleByIdQuery } from '../../use-case/queries/implements/sample-get
 import { SampleResponseCodeConstant } from '../constants/sample-response-code.constant';
 import { CreateSampleRequest } from '../request/create-sample.request';
 import { SampleResponseDto } from '../response/sample.response.dto';
+import { Public, Roles } from 'shared/decorators/auth.decorators';
+import { UserRole } from 'shared/domain/enums/user-role.enum';
 
 @ApiTags('Samples')
+@ApiBearerAuth()
 @Controller('samples')
 export class SampleController {
   constructor(
@@ -29,7 +37,9 @@ export class SampleController {
     private readonly queryBus: QueryBus,
   ) {}
 
+  // Every route requires a valid access token by default (global JwtAuthGuard).
   @Post()
+  @Roles(UserRole.LANDLORD, UserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ResponseCode(SampleResponseCodeConstant.SAMPLE_CREATED)
   @ApiOperation({
@@ -63,6 +73,7 @@ export class SampleController {
   }
 
   @Get(':id')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ResponseCode(SampleResponseCodeConstant.SAMPLE_FETCHED)
   @ApiOperation({
@@ -86,6 +97,7 @@ export class SampleController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ResponseCode(SampleResponseCodeConstant.SAMPLE_DELETED)
   @ApiOperation({
