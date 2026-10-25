@@ -65,30 +65,30 @@ Domain không import NestJS, TypeORM hoặc RabbitMQ. Infrastructure implement c
 src/
 ├── shared/
 │   ├── application/
-│   │   ├── messaging/       # integration event, publisher port
-│   │   └── transaction/     # Unit of Work port
+│   │   ├── messaging/       # integration event, OutboxConfig
+│   │   └── ports/           # Unit of Work port, publisher port
 │   ├── domain/
-│   │   ├── entities/        # BaseEntity, AggregateRoot
-│   │   ├── messaging/       # DomainEvent
-│   │   ├── repositories/    # shared repository contracts
-│   │   └── transaction/     # TransactionContext (opaque marker cho repository port)
-│   └── infra/
-│       ├── rabbitmq/        # RabbitMQ adapters
-│       └── typeorm/         # database and transaction adapters
+│   │   ├── base/            # BaseEntity, AggregateRoot, DomainEvent
+│   │   └── repositories/    # BaseRepository, TransactionContext (opaque marker cho repository port)
+│   └── infrastructure/
+│       ├── messaging/rabbitmq/  # RabbitMQ adapters
+│       └── database/            # database and transaction adapters
 └── modules/
     ├── sample/
     │   ├── domain/
-    │   ├── use-case/
-    │   ├── infra/
-    │   └── presentation/
+    │   ├── application/
+    │   ├── infrastructure/
+    │   └── presentation/    # http/ + messaging/ (subscriber)
     ├── outbox/              # phía producer: outbox + relay
     │   ├── domain/
-    │   ├── use-case/relay/
-    │   └── infra/
+    │   ├── application/outbox-relay/
+    │   └── infrastructure/
     └── inbox/               # phía consumer: dedup theo messageId
-        ├── application/     # InboxRepository port
-        └── infra/
+        ├── application/ports/   # InboxRepository port
+        └── infrastructure/
 ```
+
+Quy ước chung về tầng và đặt tên: [`architecture.md`](architecture.md).
 
 `inbox` không có `domain/`: nó không có trạng thái hay luật nghiệp vụ, chỉ là một
 thao tác atomic `INSERT ... ON CONFLICT DO NOTHING`. Mô hình hoá thành entity sẽ dẫn tới
@@ -263,7 +263,7 @@ pbl6.events (durable topic exchange)
   sau khi retry. Consumer nào cần thứ tự tuyệt đối phải tự kiểm tra (ví dụ bỏ qua event
   có `occurredAt` cũ hơn trạng thái đã lưu).
 - Module tự khai báo consumer bằng `ConsumerRegistry.define()`
-  (`shared/infra/rabbitmq/consumer/consumer-registry.ts`);
+  (`shared/infrastructure/messaging/rabbitmq/consumer/consumer-registry.ts`);
   `RabbitMqConfigService` dựng queue, retry và DLQ cho mọi consumer đã đăng ký.
 
 Publisher dùng `@golevelup/nestjs-rabbitmq`:

@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { AccessTokenVerifier } from './services/access-token-verifier.service';
-import { ServiceTokenGuard } from './guards/service-token.guard';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { ActiveUserGuard } from './guards/active-user.guard';
-import { RolesGuard } from './guards/roles.guard';
+import { AccessTokenVerifier } from 'shared/infrastructure/security/access-token-verifier.service';
+import { ServiceTokenGuard } from 'shared/presentation/guards/service-token.guard';
+import { JwtAuthGuard } from 'shared/presentation/guards/jwt-auth.guard';
+import { ActiveUserGuard } from 'shared/presentation/guards/active-user.guard';
+import { RolesGuard } from 'shared/presentation/guards/roles.guard';
 
 /**
  * Registers the global guards, in order:

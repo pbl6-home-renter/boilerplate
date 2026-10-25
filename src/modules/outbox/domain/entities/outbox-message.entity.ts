@@ -1,7 +1,7 @@
-import { BaseEntity } from 'shared/domain/entities/base.entity';
-import { DomainEvent } from 'shared/domain/messaging/domain-event';
+import { BaseEntity } from 'shared/domain/base/base.entity';
+import { DomainEvent } from 'shared/domain/base/domain-event';
 import { Uuid } from 'shared/domain/value-objects/uuid.vo';
-import { generateUuid } from 'utils/uuid.utils';
+import { generateUuid } from 'shared/domain/value-objects/uuid.vo';
 import { OUTBOX_MAX_ERROR_LENGTH } from '../constants/outbox.constants';
 import { OutboxStatus } from '../enums/outbox-status.enum';
 import { InvalidOutboxStatusTransitionException } from '../exceptions/invalid-outbox-status-transition.exception';

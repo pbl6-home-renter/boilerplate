@@ -1,4 +1,4 @@
-import { Uuid } from '../../domain/value-objects/uuid.vo';
+import { Uuid } from 'shared/domain/value-objects/uuid.vo';
 
 export interface IntegrationEvent<TPayload = Record<string, unknown>> {
   readonly id: Uuid;

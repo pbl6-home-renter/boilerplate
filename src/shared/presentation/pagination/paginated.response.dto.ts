@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { OffsetPaginationDto } from './offset-pagination.dto';
-import { IPaginationResponseDto } from '../../domain/pagination/i-pagination.response.dto';
+import { PaginatedResult } from 'shared/application/pagination/paginated-result';
 
 export class PaginatedResponseDto<T> {
   @ApiProperty({
@@ -16,7 +16,7 @@ export class PaginatedResponseDto<T> {
   })
   pagination: OffsetPaginationDto;
 
-  static create<T>(result: IPaginationResponseDto<T>): PaginatedResponseDto<T> {
+  static create<T>(result: PaginatedResult<T>): PaginatedResponseDto<T> {
     return {
       data: result.data,
       pagination: {

@@ -1,4 +1,4 @@
-import { TransactionContext } from 'shared/domain/transaction/transaction-context';
+import { TransactionContext } from 'shared/domain/repositories/transaction-context';
 import { Uuid } from 'shared/domain/value-objects/uuid.vo';
 import { OutboxMessage } from '../entities/outbox-message.entity';
 
