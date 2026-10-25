@@ -312,6 +312,8 @@ Các nhóm config chính:
 
 - `RABBITMQ_EXCHANGE`, `RABBITMQ_EXCHANGE_TYPE`;
 - `RABBITMQ_PREFETCH`, `RABBITMQ_CONNECT_TIMEOUT_MS`;
+- `RABBITMQ_PUBLISH_MANDATORY` (mặc định `true`; chỉ tắt tạm khi consumer của routing key
+  chưa tồn tại, vì lúc đó message không có queue sẽ bị broker bỏ im lặng);
 - `OUTBOX_RELAY_INTERVAL_MS`, `OUTBOX_RELAY_BATCH_SIZE`;
 - `OUTBOX_PUBLISH_TIMEOUT_MS`, `OUTBOX_CLAIM_TIMEOUT_MS`;
 - `RABBITMQ_CONSUMER_MAX_ATTEMPTS`, `RABBITMQ_CONSUMER_RETRY_DELAY_MS`;

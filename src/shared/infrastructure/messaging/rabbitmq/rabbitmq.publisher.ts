@@ -16,12 +16,14 @@ export class RabbitmqPublisher
   private readonly returnedMessageIds = new Set<string>();
   private returnListenerRegistered = false;
   private readonly exchange: string;
+  private readonly mandatory: boolean;
 
   constructor(
     private readonly amqp: AmqpConnection,
     config: ApiConfigService,
   ) {
     this.exchange = config.rabbitMqConfig.exchange;
+    this.mandatory = config.rabbitMqConfig.publishMandatory;
   }
 
   onModuleInit(): void {
@@ -36,7 +38,7 @@ export class RabbitmqPublisher
 
     const publishOptions: Options.Publish & { timeout?: number } = {
       persistent: true,
-      mandatory: true,
+      mandatory: this.mandatory,
       messageId: event.id,
       correlationId: event.aggregateId,
       type: event.eventType,
