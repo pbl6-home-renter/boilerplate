@@ -1,4 +1,4 @@
-﻿import { DomainEvent } from 'shared/domain/messaging/domain-event';
+﻿import { DomainEvent } from 'shared/domain/base/domain-event';
 import {
   SAMPLE_AGGREGATE_TYPE,
   SAMPLE_EVENTS,

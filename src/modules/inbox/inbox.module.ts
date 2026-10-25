@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { INBOX_DI_TOKEN } from './inbox.di-token';
-import { InboxTypeormEntity } from './infra/persistence/inbox.typeorm-entity';
-import { TypeOrmInboxRepository } from './infra/persistence/inbox.repository';
+import { InboxTypeormEntity } from './infrastructure/persistence/inbox.typeorm-entity';
+import { TypeOrmInboxRepository } from './infrastructure/persistence/inbox.repository';
 
 @Module({
   imports: [TypeOrmModule.forFeature([InboxTypeormEntity])],

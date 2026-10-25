@@ -10,11 +10,12 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { SortOrder } from '../../domain/value-objects/sort-order.vo';
+import { OffsetPageQuery } from 'shared/application/pagination/offset-page-query';
+import { SortOrder } from 'shared/domain/value-objects/sort-order.vo';
 
 export class OffsetPaginationQueryRequestDto<
   TFilter = Record<string, unknown>,
-> implements OffsetPaginationQueryRequestDto<TFilter> {
+> implements OffsetPageQuery<TFilter> {
   @ApiPropertyOptional({
     description: 'Số nguyên dương, bắt đầu từ 1',
     default: 1,
@@ -52,15 +53,15 @@ export class OffsetPaginationQueryRequestDto<
   sort?: string;
 
   @ApiPropertyOptional({
-    description: 'Thứ tự sắp xếp: asc hoặc desc (chỉ áp dụng cho sort)',
+    description:
+      'Thứ tự sắp xếp: asc hoặc desc. Bỏ trống thì dùng thứ tự mặc định của endpoint.',
     enum: ['asc', 'desc'],
-    default: 'asc',
   })
   @IsOptional()
   @IsIn(['asc', 'desc'], {
     message: 'order must be either asc or desc',
   })
-  order?: SortOrder = 'asc';
+  order?: SortOrder;
 
   @ApiPropertyOptional({
     description:

@@ -1,15 +1,13 @@
-import { BaseEntity } from '../entities/base.entity';
-import { IOffsetPaginationQueryRequestDto } from '../pagination/i-offset-pagination.query.request.dto';
+import { BaseEntity } from '../base/base.entity';
 import { Uuid } from '../value-objects/uuid.vo';
-import { IPaginationResponseDto } from '../pagination/i-pagination.response.dto';
-import { TransactionContext } from '../transaction/transaction-context';
+import { TransactionContext } from './transaction-context';
 
+/**
+ * Minimal contract of an aggregate repository. Queries beyond lookup by id
+ * (pagination, filters) are declared on the aggregate's own repository.
+ */
 export interface BaseRepository<T extends BaseEntity> {
   save(entity: T, context?: TransactionContext): Promise<void>;
-
-  findPaginated(
-    options: IOffsetPaginationQueryRequestDto,
-  ): Promise<IPaginationResponseDto<T>>;
 
   findById(id: Uuid): Promise<T | null>;
 

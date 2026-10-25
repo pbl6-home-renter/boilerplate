@@ -10,7 +10,7 @@ Boilerplate chuẩn doanh nghiệp (Enterprise-ready) tinh gọn và rõ ràng, 
 - **CQRS Pattern (@nestjs/cqrs)**: Tách bạch rõ ràng giữa Commands (Ghi/Sửa/Xóa dữ liệu), Queries (Đọc dữ liệu) và Events (Xử lý sự kiện nội bộ).
 - **Dependency Inversion (DI Tokens)**: Sử dụng Symbol DI Token để đảo ngược phụ thuộc giữa Domain và Infrastructure.
 - **Cơ sở dữ liệu (TypeORM & PostgreSQL)**: Cấu hình Data Source tối ưu, tự động mapping snake_case naming strategy, hỗ trợ Migration và Database Seeding (`typeorm-extension`).
-- **Global Exception Filter chuẩn Clean Architecture**: Tự động nhận diện Domain Exception (`BaseException`), NestJS `HttpException`, và Validation errors để map HTTP status code chuẩn xác (404, 409, 400...).
+- **Global Exception Filter chuẩn Clean Architecture**: Tự động nhận diện Domain Exception (`DomainException`), NestJS `HttpException`, và Validation errors để map HTTP status code chuẩn xác (404, 409, 400...).
 - **Tài liệu API tự động (Swagger/OpenAPI)**: Tự động sinh tài liệu API trực quan tại `/swagger`.
 - **Bộ khung thuần khiết (Pure Skeleton)**: Không chứa logic nghiệp vụ dư thừa, dễ dàng sao chép và mở rộng cho bất kỳ dự án nào.
 
@@ -28,44 +28,33 @@ boilerplate/
 ├── src/
 │   ├── main.ts                     # Bootstrap REST API, Swagger & Validation
 │   ├── app.module.ts               # Root module nạp các module con
+│   ├── config/service.constants.ts # ServiceConstants: PATH, tên Swagger, DB mặc định
+│   ├── database/migrations/        # Migration của service
 │   │
-│   ├── filter/                     # Exception filters (Global Exception Filter)
-│   ├── interceptor/                # Interceptors (Logging, Transform...)
-│   ├── utils/                      # Tiện ích dùng chung (UUID crypto...)
-│   │
-│   ├── shared/                     # Shared kernel & core hạ tầng dùng chung
-│   │   ├── shared.module.ts        # Global Module
-│   │   ├── application/             # Transaction and messaging ports
-│   │   ├── configuration/          # Cấu hình Swagger, Logger, Naming Strategy
-│   │   ├── decorators/             # Custom decorators
-│   │   ├── di-tokens/              # Global Dependency Injection Tokens
-│   │   ├── domain/                 # Base Entity, Base Repo, Base Exception, VOs
-│   │   ├── infra/                  # TypeORM, RabbitMQ & transaction adapters
-│   │   ├── presentation/           # Shared DTOs, response wrappers
-│   │   └── services/               # ApiConfigService (type-safe env config)
+│   ├── shared/                     # Shared kernel, giống hệt nhau giữa các service
+│   │   ├── shared.module.ts        # Global Module (Config, TypeORM, RabbitMQ, UnitOfWork)
+│   │   ├── security.module.ts      # Guard toàn cục
+│   │   ├── domain/                 # BaseEntity, AggregateRoot, DomainException, Uuid, BaseRepository
+│   │   ├── application/            # Port (UnitOfWork, publisher), phân trang, contract xác thực
+│   │   ├── infrastructure/         # Config, TypeORM, RabbitMQ, verify access token
+│   │   └── presentation/           # Guard, decorator, validator, filter/interceptor/pipe/middleware HTTP
 │   │
 │   └── modules/
-│       ├── health/                 # Health check endpoint (/health)
-│       ├── inbox/                   # Consumer-side dedup (processed_events)
-│       │   ├── application/         # InboxRepository port
-│       │   └── infra/               # TypeORM persistence
-│       ├── outbox/                  # Transactional Outbox & relay
-│       │   ├── domain/              # Outbox state machine and repository port
-│       │   ├── use-case/            # Relay orchestration
-│       │   └── infra/               # TypeORM persistence and scheduler
+│       ├── health/                 # Health check endpoint
+│       ├── inbox/                  # Consumer-side dedup (processed_events)
+│       ├── outbox/                 # Transactional Outbox & relay
 │       └── sample/                 # [MODULE MẪU] Chuẩn Clean Architecture & CQRS
 │           ├── sample.di-token.ts
 │           ├── sample.module.ts
-│           ├── domain/             # Entities, Repositories, Exceptions
-│           ├── use-case/           # Application use cases
-│           │   ├── commands/
-│           │   │   ├── implements/ # Command objects
-│           │   │   └── handlers/   # Command handlers
-│           │   └── queries/
-│           │       ├── implements/ # Query objects
-│           │       └── handlers/   # Query handlers
-│           ├── infra/              # TypeORM Entity, Repository impl, Mappers
-│           └── presentation/       # Controllers, Requests, Response DTOs
+│           ├── domain/             # Entities, events, exceptions, repository interface
+│           ├── application/
+│           │   ├── commands/sample-create/   # SampleCreateCommand + handler
+│           │   └── queries/sample-get-by-id/ # SampleGetByIdQuery + handler
+│           ├── infrastructure/
+│           │   └── persistence/    # TypeORM entity, repository, mappers/
+│           └── presentation/
+│               ├── http/           # controllers/, requests/, responses/, constants/
+│               └── messaging/      # RabbitMQ subscriber
 │
 ├── .env.example                    # Template biến môi trường
 ├── Dockerfile                      # Multi-stage Dockerfile (build & runner)
@@ -140,13 +129,13 @@ sequenceDiagram
     actor Client
     participant Controller as SampleController (Presentation)
     participant CommandBus as CommandBus (CQRS)
-    participant Handler as CreateSampleCommandHandler
+    participant Handler as SampleCreateCommandHandler
     participant Domain as SampleEntity (Domain)
     participant Repo as SampleRepository (Infra)
     participant DB as PostgreSQL Database
 
     Client->>Controller: POST /api/v1/samples (CreateSampleRequest)
-    Controller->>CommandBus: execute(new CreateSampleCommand(...))
+    Controller->>CommandBus: execute(new SampleCreateCommand(...))
     CommandBus->>Handler: execute(command)
     Handler->>Domain: SampleEntity.create(props)
     Handler->>Repo: save(sample)
@@ -199,70 +188,9 @@ docker run -p 3001:3001 --env-file .env rentify-backend:local
 
 ## 📋 Hướng dẫn thêm Module mới chuẩn Clean Architecture & CQRS
 
-Khi bạn muốn thêm một tính năng/domain mới (ví dụ `products`):
-
-### Bước 1: Tạo cấu trúc thư mục
-
-Tạo thư mục `src/modules/products/` với các thư mục con:
-
-- `domain/`: `entities/`, `repositories/`, `exceptions/`
-- `use-case/`: `commands/`, `queries/`
-- `infra/`: `persistence/`, `mappers/`
-- `presentation/`: `controllers/`, `request/`, `response/`
-
-### Bước 2: Định nghĩa DI Token
-
-Tạo `products/product.di-token.ts`:
-
-```typescript
-export const PRODUCT_DI_TOKEN = {
-  REPOSITORY: Symbol('PRODUCT_REPOSITORY'),
-} as const;
-```
-
-### Bước 3: Xây dựng Domain Model & Repository Interface
-
-1. Tạo Entity kế thừa `BaseEntity` tại `domain/entities/product.entity.ts`.
-2. Tạo interface `ProductRepository` kế thừa `BaseRepository<ProductEntity>` tại `domain/repositories/product.repository.ts`.
-
-### Bước 4: Tạo Tầng Hạ Tầng (Infrastructure)
-
-1. Tạo TypeORM entity kế thừa `AbstractEntity` tại `infra/persistence/product.typeorm-entity.ts`.
-2. Tạo mapper chuyển đổi 2 chiều giữa Domain Entity và TypeORM Entity tại `infra/mappers/product.mapper.ts`.
-3. Tạo repository class triển khai interface `ProductRepository` tại `infra/persistence/product.repository.ts`.
-
-### Bước 5: Viết Use Cases (CQRS)
-
-1. **Command**: Tạo `CreateProductCommand` và `CreateProductCommandHandler`.
-2. **Query**: Tạo `GetProductByIdQuery` và `GetProductByIdQueryHandler`.
-
-### Bước 6: Xây dựng Presentation Layer
-
-1. Tạo DTOs validation tại `presentation/request/` và `presentation/response/`.
-2. Tạo Controller inject `CommandBus` và `QueryBus` tại `presentation/controllers/product.controller.ts`.
-
-### Bước 7: Khai báo Module
-
-Tạo `products.module.ts`:
-
-```typescript
-@Module({
-  imports: [CqrsModule, TypeOrmModule.forFeature([ProductTypeormEntity])],
-  controllers: [ProductController],
-  providers: [
-    {
-      provide: PRODUCT_DI_TOKEN.REPOSITORY,
-      useClass: TypeOrmProductRepository,
-    },
-    ...commandHandlers,
-    ...queryHandlers,
-  ],
-  exports: [PRODUCT_DI_TOKEN.REPOSITORY],
-})
-export class ProductsModule {}
-```
-
-Cuối cùng, import `ProductsModule` vào `app.module.ts`.
+Xem [`docs/architecture.md`](docs/architecture.md) mục 4–5: layout module, quy ước đặt tên
+use case `<noun>-<verb>` (vd. `commands/product-create/` → `ProductCreateCommand`) và các
+bước tạo domain, repository, use case, controller, module. Module `sample` là ví dụ đầy đủ.
 
 ---
 
@@ -284,44 +212,25 @@ Cuối cùng, import `ProductsModule` vào `app.module.ts`.
 
 ## 🧭 Kiến trúc DDD & Clean Architecture
 
-Boilerplate tổ chức mỗi bounded context theo dependency direction:
+Cả `shared/` lẫn từng module đều chia 4 tầng với dependency một chiều:
 
 ```text
-Presentation → Application/Use-case → Domain
-       ↓                 ↓
-Infrastructure ─────────┘
+presentation ──┐
+               ├──► application ──► domain
+infrastructure ┘
 ```
 
-- `domain/`: Entity, Aggregate Root, Value Object, domain event và repository port.
-- `use-case/`: command/query handlers và orchestration nghiệp vụ.
-- `infra/`: TypeORM entity, mapper, repository adapter, RabbitMQ adapter và scheduler.
+- `domain/`: Entity, Aggregate Root, Value Object, domain event và repository interface.
+- `application/`: command/query handler, port cho hạ tầng.
+- `infrastructure/`: TypeORM entity, mapper, repository adapter, RabbitMQ adapter và scheduler.
 - `presentation/`: HTTP controller, request/response DTO và broker subscriber.
 
 Domain không import NestJS, TypeORM hay RabbitMQ. Infrastructure implement port bằng
 DI token. `BaseEntity` chỉ chứa identity/lifecycle; aggregate có behavior và là nơi
 phát domain event. Entity đọc từ database phải được reconstitute để không phát lại event.
 
-### Thêm module mới
-
-```text
-src/modules/<context>/
-├── domain/
-│   ├── entities/
-│   ├── events/
-│   ├── repositories/
-│   └── exceptions/
-├── use-case/
-│   ├── commands/
-│   └── queries/
-├── infra/
-│   ├── persistence/
-│   ├── mappers/
-│   └── messaging/
-└── presentation/
-    ├── controllers/
-    ├── request/
-    └── response/
-```
+Chi tiết (cấu trúc `shared/`, quy ước import, cách đồng bộ `shared/` sang service khác,
+lệnh kiểm tra dependency rule): [`docs/architecture.md`](docs/architecture.md).
 
 Command thay đổi state và có thể phát domain event. Query chỉ đọc. Domain event mô tả
 sự kiện trong bounded context; integration event là contract gửi qua message broker.
@@ -384,7 +293,7 @@ Mỗi service **tự verify access token** (RS256) do Identity-Service phát hà
 
 Mọi guard đều phải pass; thứ tự chỉ quyết định lỗi nào được trả khi nhiều guard cùng fail.
 
-Decorator ([src/shared/decorators/auth.decorators.ts](src/shared/decorators/auth.decorators.ts)):
+Decorator ([src/shared/presentation/decorators/auth/](src/shared/presentation/decorators/auth/)):
 
 ```ts
 @Public()                         // không cần token (có token hợp lệ vẫn gắn request.user)
@@ -397,7 +306,7 @@ Decorator ([src/shared/decorators/auth.decorators.ts](src/shared/decorators/auth
 
 Quy ước đường dẫn khi fork:
 
-- Đổi `SERVICE_PATH` trong [src/shared/constants/service.constants.ts](src/shared/constants/service.constants.ts) (vd. `tenancy`). Health: `GET /api/v1/<SERVICE_PATH>/health`, Swagger: `/api/v1/<SERVICE_PATH>/swagger`.
+- Đổi `ServiceConstants.PATH` (và `TITLE`, `DESCRIPTION`, `DEFAULT_DATABASE_NAME`) trong [src/config/service.constants.ts](src/config/service.constants.ts) (vd. `tenancy`). Không sửa `src/shared/`. Health: `GET /api/v1/<PATH>/health`, Swagger: `/api/v1/<PATH>/swagger`.
 - Endpoint nội bộ đặt dưới `internal/...` (nằm **ngoài** prefix `api/v1`, gateway không route tới).
 - Ownership dữ liệu (vd. landlord chỉ sửa building của mình) kiểm tra trong use-case, không phải guard.
 - Service không bật CORS; API Gateway lo phần này.

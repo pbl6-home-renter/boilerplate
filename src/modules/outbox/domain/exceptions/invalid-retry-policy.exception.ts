@@ -1,6 +1,6 @@
-import { BaseException } from 'shared/domain/exceptions/base.exception';
+import { DomainException } from 'shared/domain/exceptions/domain.exception';
 
-export class InvalidRetryPolicyException extends BaseException {
+export class InvalidRetryPolicyException extends DomainException {
   constructor(reason: string) {
     super(
       `Invalid retry policy: ${reason}`,
