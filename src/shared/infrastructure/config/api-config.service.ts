@@ -45,6 +45,11 @@ export class ApiConfigService {
         'RABBITMQ_CONNECT_TIMEOUT_MS',
         10000,
       ),
+      publishMandatory: getConfigBoolean(
+        this.configService,
+        'RABBITMQ_PUBLISH_MANDATORY',
+        true,
+      ),
       consumerMaxAttempts: getConfigNumber(
         this.configService,
         'RABBITMQ_CONSUMER_MAX_ATTEMPTS',
