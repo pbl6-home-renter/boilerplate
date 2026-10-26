@@ -109,6 +109,10 @@ cp .env.example .env
 | `OUTBOX_RELAY_INTERVAL_MS` | `1000` | Không | Chu kỳ poll outbox |
 | `OUTBOX_MAX_ATTEMPTS` | `10` | Không | Tổng số lần publish (tính cả lần đầu) trước khi chuyển `FAILED` |
 | `OUTBOX_RETENTION_MS` | `604800000` | Không | Thời gian giữ row `PUBLISHED` |
+| **Gọi service khác (internal HTTP)** | | | |
+| `IDENTITY_SERVICE_URL` | `http://localhost:3001` | Khi cần gọi Identity | Base URL Identity-Service trong private network (`http://identity:3001` trên Docker) |
+| `TENANCY_SERVICE_URL` | `http://localhost:3002` | Khi cần gọi Tenancy | Base URL Tenancy-Service (`http://tenancy:3002` trên Docker) |
+| `INTERNAL_HTTP_TIMEOUT_MS` | `3000` | Không | Timeout mỗi lời gọi nội bộ |
 | **Redis Cache (Tùy chọn)** | | | |
 | `REDIS_HOST` | `localhost` | Không | Host Redis server |
 | `REDIS_PORT` | `6379` | Không | Cổng Redis |
@@ -312,6 +316,21 @@ Quy ước đường dẫn khi fork:
 - Service không bật CORS; API Gateway lo phần này.
 
 Biến môi trường: `JWKS_URL` (hoặc `JWT_PUBLIC_KEY`), `JWT_ISSUER`, `JWT_AUDIENCE` phải khớp Identity-Service; `SERVICE_TOKEN` dùng chung giữa các service.
+
+### Gọi service khác (internal HTTP)
+
+- **Chỉ dùng để đọc (GET).** Ghi dữ liệu sang service khác thì phát event qua outbox.
+- Gọi thẳng trong private network (`IDENTITY_SERVICE_URL`, `TENANCY_SERVICE_URL`), không đi qua gateway. Timeout `INTERNAL_HTTP_TIMEOUT_MS` (mặc định 3s).
+- Inject `INTERNAL_HTTP_DI_TOKEN.CLIENT` (`IInternalHttpClient`) vào service ở tầng `infrastructure/` của module, sau một port riêng của module. Client tự gắn `X-Service-Token` (hoặc `Authorization` nếu truyền `bearerToken`) và trả về `data` đã bóc envelope.
+- **Không retry.** Lỗi mạng/timeout/5xx → `PeerServiceUnavailableException` (503 `SERVICE_UNAVAILABLE`); 4xx → `PeerServiceRequestException` (giữ `statusCode`, `code` của peer). Use-case tự chọn: dữ liệu hiển thị thì fallback (`null`), dữ liệu ra quyết định thì để lỗi 503 đi ra (fail-closed).
+- Type của response được khai báo lại trong module gọi, không import từ service khác (D58).
+
+```ts
+const stats = await this.client.get<UserStats>(
+  PeerService.TENANCY,
+  `/internal/users/${userId}/stats`,
+);
+```
 
 ---
 

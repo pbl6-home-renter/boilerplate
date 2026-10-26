@@ -9,6 +9,7 @@ import { DatabaseConfig, resolveDatabaseConfig } from './database.config';
 import { OutboxConfig } from 'shared/application/messaging/outbox.config';
 import { RabbitMqConfig } from './rabbitmq.config';
 import { AuthConfig } from './auth.config';
+import { PeerServicesConfig } from './peer-services.config';
 
 @Injectable()
 export class ApiConfigService {
@@ -138,6 +139,26 @@ export class ApiConfigService {
         'rentify-api',
       ),
       serviceToken: getConfigString(this.configService, 'SERVICE_TOKEN', ''),
+    };
+  }
+
+  get peerServices(): PeerServicesConfig {
+    return {
+      identityUrl: getConfigString(
+        this.configService,
+        'IDENTITY_SERVICE_URL',
+        '',
+      ),
+      tenancyUrl: getConfigString(
+        this.configService,
+        'TENANCY_SERVICE_URL',
+        '',
+      ),
+      timeoutMs: getConfigNumber(
+        this.configService,
+        'INTERNAL_HTTP_TIMEOUT_MS',
+        3000,
+      ),
     };
   }
 }
