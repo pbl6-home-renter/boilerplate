@@ -30,10 +30,11 @@ Hệ quả cụ thể:
   Identity cần chúng, và domain không được import `application/`.
 - Handler không đọc `ApiConfigService` trực tiếp. Module cung cấp cấu hình qua DI token
   (xem `OUTBOX_DI_TOKEN.CONFIG` trong `modules/outbox/outbox.module.ts`).
-- Command/query không import request DTO. File command khai báo `export interface <Tên>Input`
-  (vd. `UserLockInput`) và `XCommand.create(input)` nhận kiểu đó; request DTO
-  `implements <Tên>Input` (presentation → application, đúng chiều). Đổi/xoá field bắt buộc ở
-  DTO mà quên cập nhật thì compiler báo lỗi. Query handler trả kiểu domain/`PaginatedResult`, controller map sang response DTO.
+- Command/query không import request DTO. Request DTO có `static toCommand(request, ...ngữ cảnh)`
+  (vd. `SampleCreateRequestDto.toCommand(request)`, `CreateRatePolicyRequest.toCommand(request, user.id)`
+  ở Tenancy) — presentation → application, đúng chiều. Controller không tự map từng field.
+  Query handler trả kiểu domain/`PaginatedResult`, controller map sang response DTO bằng
+  `XResponseDto.fromDomain`.
 - Import chéo module tuân theo cùng chiều phụ thuộc: `domain/` và `application/` của module
   này không được import `infrastructure/`/`presentation/` của **bất kỳ** module nào. Import
   cùng tầng giữa hai module được phép, ví dụ quan hệ TypeORM giữa `UserEntity` và
@@ -133,8 +134,9 @@ file và tên class, để các use case của cùng một aggregate nằm cạn
 | `queries/sample-get-by-id/` | `SampleGetByIdQuery`, `SampleGetByIdQueryHandler` |
 | `commands/password-reset-request/` | `PasswordResetRequestCommand` |
 
-Request/response DTO giữ tên theo API (vd. `CreateSampleRequest`) vì tên class xuất hiện
-trong schema Swagger.
+Request/response DTO theo cùng quy ước: `requests/sample-create.request.dto.ts` →
+`SampleCreateRequestDto`, `responses/sample.response.dto.ts` → `SampleResponseDto`. Bảng đầy đủ
+ở skill `be-naming` (`.agents/skills/be-naming/SKILL.md`).
 
 ### Import
 
@@ -153,7 +155,8 @@ trong schema Swagger.
    thư mục sẽ làm app và CLI dừng ngay khi khởi động với thông báo chỉ rõ file),
    `product.repository.ts`, `mappers/product.mapper.ts`.
 4. `application/commands/product-create/`, `application/queries/product-get-by-id/`.
-5. `presentation/http/`: controller, `requests/`, `responses/`, `constants/` (response code).
+5. `presentation/http/`: controller, `requests/` (`<noun>-<verb>.request.dto.ts`, có `static toCommand`),
+   `responses/` (`<noun>.response.dto.ts`, có `static fromDomain`), `constants/` (response code).
 6. `products.module.ts` đăng ký provider theo DI token; import vào `app.module.ts`.
 7. Migration: `npm run migration:generate -- src/database/migrations/<Name>`.
 

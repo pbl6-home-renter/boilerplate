@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Post,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
@@ -23,7 +24,7 @@ import { SampleCreateCommand } from '../../../application/commands/sample-create
 import { SampleDeleteCommand } from '../../../application/commands/sample-delete/sample-delete.command';
 import { SampleGetByIdQuery } from '../../../application/queries/sample-get-by-id/sample-get-by-id.query';
 import { SampleResponseCodeConstant } from '../constants/sample-response-code.constant';
-import { CreateSampleRequest } from '../requests/create-sample.request';
+import { SampleCreateRequestDto } from '../requests/sample-create.request.dto';
 import { SampleResponseDto } from '../responses/sample.response.dto';
 import {
   Public,
@@ -67,11 +68,12 @@ export class SampleController {
     dataDto: SampleResponseDto,
   })
   async create(
-    @Body() request: CreateSampleRequest,
+    @Body() request: SampleCreateRequestDto,
   ): Promise<SampleResponseDto> {
-    const sample: SampleEntity = await this.commandBus.execute(
-      new SampleCreateCommand(request.title, request.description),
-    );
+    const sample = await this.commandBus.execute<
+      SampleCreateCommand,
+      SampleEntity
+    >(SampleCreateRequestDto.toCommand(request));
     return SampleResponseDto.fromDomain(sample);
   }
 
@@ -92,7 +94,9 @@ export class SampleController {
     code: SampleResponseCodeConstant.SAMPLE_FETCHED,
     dataDto: SampleResponseDto,
   })
-  async getById(@Param('id') id: Uuid): Promise<SampleResponseDto> {
+  async getById(
+    @Param('id', ParseUUIDPipe) id: Uuid,
+  ): Promise<SampleResponseDto> {
     const sample: SampleEntity = await this.queryBus.execute(
       new SampleGetByIdQuery(id),
     );
@@ -116,7 +120,7 @@ export class SampleController {
     status: HttpStatus.NO_CONTENT,
     code: SampleResponseCodeConstant.SAMPLE_DELETED,
   })
-  async delete(@Param('id') id: Uuid): Promise<void> {
+  async delete(@Param('id', ParseUUIDPipe) id: Uuid): Promise<void> {
     await this.commandBus.execute(new SampleDeleteCommand(id));
   }
 }
