@@ -2,4 +2,5 @@
 export enum PeerService {
   IDENTITY = 'identity',
   TENANCY = 'tenancy',
+  COMMUNITY = 'community',
 }

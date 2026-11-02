@@ -154,6 +154,11 @@ export class ApiConfigService {
         'TENANCY_SERVICE_URL',
         '',
       ),
+      communityUrl: getConfigString(
+        this.configService,
+        'COMMUNITY_SERVICE_URL',
+        '',
+      ),
       timeoutMs: getConfigNumber(
         this.configService,
         'INTERNAL_HTTP_TIMEOUT_MS',
