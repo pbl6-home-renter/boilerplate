@@ -6,6 +6,7 @@ import { RabbitmqModule } from 'shared/infrastructure/messaging/rabbitmq/rabbitm
 import { TypeOrmUnitOfWork } from 'shared/infrastructure/database/transaction/typeorm-unit-of-work';
 import { UNIT_OF_WORK_DI_TOKEN } from 'shared/application/di-tokens';
 import { InternalHttpModule } from 'shared/infrastructure/http/internal-http.module';
+import { AuditModule } from 'modules/audit/audit.module';
 
 @Global()
 @Module({
@@ -17,6 +18,7 @@ import { InternalHttpModule } from 'shared/infrastructure/http/internal-http.mod
     TypeormModule,
     RabbitmqModule,
     InternalHttpModule,
+    AuditModule,
   ],
   providers: [
     ApiConfigService,

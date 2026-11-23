@@ -186,3 +186,132 @@ grep -rnE "from '[^']*application" src/shared/domain src/modules/*/domain
 Repository của aggregate chỉ kế thừa `BaseRepository` khi thật sự hỗ trợ đủ `save`,
 `findById`, `delete`; không viết method `throw new Error('Method not implemented.')`.
 Ví dụ `IAuthRepository` (refresh token chỉ revoke, không xoá) tự khai báo method riêng.
+
+## 8. Audit
+
+P11-D92 chọn ghi audit sau khi command handler hoàn tất transaction. Module audit
+cung cấp `AuditEntry`, port `AuditRecorder`, decorator, explorer và adapter
+`TypeOrmAuditRecorder` ghi vào bảng `audit_logs` trong DB của service đang chạy.
+Application chỉ biết port; entity TypeORM và thao tác DB nằm ở infrastructure.
+
+Toàn bộ audit nằm trong một module. Entry và port thuộc application, DI token
+đặt ở gốc module theo cấu trúc chung của project:
+
+```text
+modules/audit/
+├── audit.module.ts
+├── audit.di-token.ts
+├── application/
+│   ├── audit-entry.ts
+│   ├── audited.decorator.ts
+│   └── ports/
+│       └── audit-recorder.port.ts
+└── infrastructure/
+    ├── audit.explorer.ts
+    └── persistence/
+        ├── audit-log.typeorm-entity.ts
+        └── audit-recorder.ts
+```
+
+### Khai báo trên handler
+
+```ts
+import { Audited } from 'modules/audit/application/audited.decorator';
+
+@Audited<UserLockCommand, User>({
+  action: 'user.locked',
+  entityType: 'user',
+  actorId: (command) => command.adminId,
+  entityId: (command) => command.userId,
+  metadata: (command) => ({ lockReason: command.lockReason }),
+  skipIf: (_command, result) => result === null,
+  onError: 'log',
+})
+async execute(command: UserLockCommand): Promise<User> {
+  // Thực hiện nghiệp vụ và await transaction như bình thường.
+}
+```
+
+`@Audited` chỉ gắn metadata bằng Reflect. Resolver nhận tham số đầu tiên của
+method (command) và kết quả đã await; explorer giữ nguyên `this` và toàn bộ tham
+số khi gọi method gốc. `metadata`, `skipIf` và `onError` là tùy chọn.
+
+Handler ném lỗi thì giữ nguyên lỗi và không ghi audit. Sau khi handler thành công,
+`skipIf(command, result)` trả `true` thì bỏ qua audit. Nếu không bỏ qua, explorer
+await `record(entry)` **không truyền context**. Adapter tự mở transaction riêng;
+lỗi audit không thể rollback transaction đã commit của command. Lỗi `record()`
+với `onError: 'log'` (mặc định) được log một lần kèm action/entityId và handler vẫn
+trả kết quả; `onError: 'throw'` ném lỗi đó ra ngoài. Lỗi resolver/`skipIf` truyền ra
+ngoài bình thường; `onError` chỉ áp dụng cho `record()`.
+
+### Import module và lưu DB
+
+Trong boilerplate, `SharedModule` đã import `AuditModule` từ
+`modules/audit/audit.module.ts`. App chỉ cần nạp `SharedModule`
+để explorer chạy ở `onModuleInit`, không cần import `AuditModule` riêng.
+`@Global()` không tự kích hoạt module nếu chưa import. Service chỉ copy các file
+audit mà chưa cập nhật wiring vẫn phải import `AuditModule` một lần trong module
+được app nạp.
+
+`AuditModule` đăng ký entity qua `TypeOrmModule.forFeature` và bind sẵn
+`AUDIT_RECORDER_DI_TOKEN` sang `TypeOrmAuditRecorder`, đồng thời export token đó.
+Service sử dụng kết nối PostgreSQL và `UNIT_OF_WORK_DI_TOKEN` có sẵn trong
+`SharedModule`, không cần bind recorder thủ công. Phải chạy migration trước khi
+ghi audit:
+
+```bash
+npm run migration:run
+```
+
+Khi `AuditModule` được import, explorer dùng `DiscoveryService` và
+`MetadataScanner` tìm method `@Audited` trên provider. Có method audit nhưng chưa
+bind `AUDIT_RECORDER_DI_TOKEN` thì explorer dừng khởi động với thông báo chỉ rõ
+method và binding còn thiếu. Module hiện đã bind adapter DB mặc định. Khi chưa
+gắn `@Audited` lên handler thì không phát sinh bản ghi audit tự động.
+
+`TypeOrmAuditRecorder.record(entry, context?)` dùng repository trong
+`TypeOrmTransactionContext` khi có context; khi không có thì mở transaction riêng
+bằng `IUnitOfWork.run`. Vì vậy audit truyền context sẽ cùng commit/rollback với
+transaction đó, còn audit từ explorer được ghi sau transaction của handler.
+
+Adapter chỉ INSERT, không update hoặc soft-delete. Bảng `audit_logs` có:
+
+- `id` UUID, `action` (tối đa 100 ký tự), `entity_type` (tối đa 50 ký tự).
+- `entity_id`, `actor_id`: UUID nullable, không có FK tới bảng riêng của service.
+- `metadata`: JSONB nullable; module dùng chung không áp đặt allowlist nghiệp vụ.
+- `occurred_at`: thời điểm sự kiện; mặc định thời điểm adapter ghi nếu entry không
+  cung cấp. `created_at` là thời điểm lưu bản ghi.
+- `source_event_id`: text nullable, có unique index để chống ghi trùng event.
+  Ghi lại cùng ID sẽ giữ nguyên bản ghi đầu tiên. Những entry không có ID này
+  được ghi riêng từng lần.
+
+Index theo `(entity_type, entity_id, occurred_at)` và `(actor_id, occurred_at)`
+phục vụ tra cứu. Entity audit khai báo riêng, không kế thừa `AbstractEntity` vì
+audit là dữ liệu append-only và không có `updated_at`/`is_deleted`.
+
+### Mở rộng sau này
+
+- Identity thêm hành động mới bằng cách thêm action vào danh sách và allowlist
+  metadata ở phần lưu trữ audit riêng của Identity, rồi gắn `@Audited` lên handler;
+  không sửa decorator, explorer hoặc contract dùng chung.
+- Service khác có thể bind `OutboxAuditRecorder` để phát `audit.recorded` qua
+  transactional outbox thay cho binding adapter DB mặc định; Identity consume
+  và lưu như P11-05. Chưa triển khai adapter outbox hoặc consumer này. Cấu hình
+  hiện tại lưu audit cục bộ trong DB của từng service, không tập trung về Identity.
+
+Khi đồng bộ cấu trúc này sang service khác:
+
+1. Copy `src/modules/audit/**` và migration
+   `src/database/migrations/1795426800901-CreateAuditLogsTable.ts`.
+2. Import `AuditModule` trong `SharedModule` hoặc một module được app nạp; giữ
+   kết nối TypeORM và binding `UNIT_OF_WORK_DI_TOKEN` hiện có.
+3. Chạy `npm run migration:run` trên DB của service đó.
+4. Dùng `@Audited` trên method handler cần audit hoặc inject recorder qua
+   `AUDIT_RECORDER_DI_TOKEN` khi cần ghi trực tiếp. Decorator import từ
+   `modules/audit/application/audited.decorator`, port từ
+   `modules/audit/application/ports/audit-recorder.port` và token từ
+   `modules/audit/audit.di-token`.
+
+Nếu đang dùng cấu trúc audit cũ trong shared, chuyển toàn bộ import sang module
+mới rồi xoá các file audit cũ để chỉ có một DI token và một explorer. Không chép
+đè toàn bộ `src/shared/` vì các service hiện có khác biệt ở auth, HTTP và DI token.
